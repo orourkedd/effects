@@ -27,14 +27,14 @@ func fn(ctx effects.Context) error {
 	fmt.Println(n.Time)
 
 	// HTTP request
-	// g := Get{
-	// 	URL: "https://www.swapi.co/api/people/1",
-	// }
-	// err = ctx.Do(&g)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// fmt.Println(g.Body)
+	g := Get{
+		URL: "https://www.swapi.co/api/people/1",
+	}
+	err = ctx.Do(&g)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(g.Body)
 
 	// pass a child context to the next function.  This is how the test framework will know
 	// where to create seams in your code.
