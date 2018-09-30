@@ -24,7 +24,7 @@ func fn(ctx effects.Context) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(n.Time)
+	// fmt.Println(n.Time)
 
 	// HTTP request
 	g := Get{
@@ -64,13 +64,15 @@ func foo(ctx effects.Context, value string) (time.Time, error) {
 	return n.Time, nil
 }
 
-func bar(ctx effects.Context) {
+func bar(ctx effects.Context) interface{} {
 	if ctx.Abort(bar) {
-		return
+		fmt.Println("abort bar")
+		return nil
 	}
 
 	// Get current time
 	n := Now{}
 	ctx.Do(&n)
 	fmt.Println(n.Time)
+	return nil
 }

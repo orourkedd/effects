@@ -5,10 +5,16 @@ import (
 	"time"
 )
 
+// Cmd -
+type Cmd interface {
+	GetValue() interface{}
+	SetValue(interface{}) error
+}
+
 // Context -
 type Context interface {
 	Child() Context
-	Do(cmd interface{}) error
+	Do(cmd Cmd) error
 	Deadline() (deadline time.Time, ok bool)
 	Done() <-chan struct{}
 	Err() error
@@ -19,7 +25,7 @@ type Context interface {
 // RealContext is an effects-as-data context
 type RealContext struct {
 	Context     context.Context
-	Interpreter func(interface{}, Context) error
+	Interpreter func(Cmd, Context) error
 }
 
 // Child -
@@ -36,7 +42,7 @@ func (ctx RealContext) Abort(args ...interface{}) bool {
 }
 
 // Do processes a command
-func (ctx RealContext) Do(cmd interface{}) error {
+func (ctx RealContext) Do(cmd Cmd) error {
 	return ctx.Interpreter(cmd, ctx)
 }
 
@@ -61,7 +67,7 @@ func (ctx RealContext) Value(key interface{}) interface{} {
 }
 
 // NewContext -
-func NewContext(interpreter func(interface{}, Context) error) Context {
+func NewContext(interpreter func(Cmd, Context) error) Context {
 	return RealContext{
 		Interpreter: interpreter,
 		Context:     context.Background(),
