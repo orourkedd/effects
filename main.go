@@ -5,26 +5,29 @@ import (
 	"log"
 	"time"
 
-	"orourkedd.com/effects/pkg/effects"
+	"github.com/orourkedd/effects/pkg/effects"
 )
 
 func main() {
-	// effects.NewContext() returns a struct that implements context.Context
 	ctx := effects.NewContext(interpreter)
-	err := fn(ctx)
+	result, err := fn(ctx)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+	fmt.Println(result)
 }
 
-func fn(ctx effects.Context) error {
+func fn(ctx effects.Context) (string, error) {
+	if ctx.Abort() { // pass in the args for asserting
+		return "", nil
+	}
+
 	// Get current time
 	n := Now{}
 	err := ctx.Do(&n)
 	if err != nil {
-		return err
+		return "", err
 	}
-	fmt.Println(n.Time)
 
 	// HTTP request
 	g := Get{
@@ -34,17 +37,16 @@ func fn(ctx effects.Context) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(g.Body)
 
 	// pass a child context to the next function.  This is how the test framework will know
 	// where to create seams in your code.
-	n2, err := foo(ctx.Child(), "foo")
-	if err != nil {
-		return err
-	}
-	fmt.Println(n2)
+	// n2, err := foo(ctx.Child(), "foo")
+	// if err != nil {
+	// 	return err
+	// }
+	// fmt.Println(n2)
 
-	return nil
+	return g.Body, nil
 }
 
 func foo(ctx effects.Context, value string) (time.Time, error) {

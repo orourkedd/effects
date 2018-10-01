@@ -2,49 +2,42 @@ package effects
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"time"
 )
 
 // TestContext is an effects-as-data context
 type TestContext struct {
-	Context     context.Context
-	Interpreter func(interface{}, Context) error
-	Args        []interface{}
-	Expected    [][]interface{}
-	CallIndex   int
+	Context      context.Context
+	Interpreter  func(interface{}, Context) error
+	Args         []interface{}
+	Expected     [][]interface{}
+	CmdChan      chan interface{}
+	ContinueChan chan interface{}
+	ShouldAbort  bool
 }
 
 // Child -
 func (ctx *TestContext) Child() Context {
 	return &TestContext{
-		Context: ctx,
+		Context:     ctx,
+		ShouldAbort: true,
 	}
 }
 
 // Abort -
 func (ctx *TestContext) Abort(args ...interface{}) bool {
-	ctx.Args = args
-	ctx.CallIndex++
-	// ctx.Context.(*TestContext).CallLog = append(ctx.Context.(*TestContext).CallLog, FunctionCall(args...))
-	return true
+	if ctx.ShouldAbort {
+		return true
+	}
+	// record stuff here
+	return false
 }
 
 // Do processes a command
 func (ctx *TestContext) Do(cmd interface{}) error {
-	// cmdType := reflect.TypeOf(cmd)
-	// cmdValue := reflect.ValueOf(cmd)
-	// fmt.Println("value:", cmdValue)
-	// fmt.Println("Type:", cmdType)
-	// copiedCmd := reflect.New(cmdType)
-	// copier.Copy(&copiedCmd, cmdValue)
-	// fmt.Println("Do", cmd, copiedCmd)
-	// ctx.CallLog = append(ctx.CallLog, copiedCmd)
-	fmt.Println("Expected:", ctx.Expected[ctx.CallIndex][0])
-	fmt.Println("Actual:", cmd)
-	fmt.Println(reflect.DeepEqual(ctx.Expected[ctx.CallIndex][0], cmd))
-	ctx.CallIndex++
+	ctx.CmdChan <- cmd
+	ctx.ContinueChan <- struct{}{}
 	return nil
 }
 
@@ -68,34 +61,59 @@ func (ctx *TestContext) Value(key interface{}) interface{} {
 	return ctx.Context.Value(key)
 }
 
+// Next -
+func (ctx *TestContext) Next() interface{} {
+	return <-ctx.CmdChan
+}
+
+// Continue -
+func (ctx *TestContext) Continue() interface{} {
+	return <-ctx.ContinueChan
+}
+
+// Wait -
+func (ctx *TestContext) Wait() {
+	ctx.ContinueChan <- struct{}{}
+}
+
+// Start -
+func (ctx *TestContext) Start(fn func()) {
+	go func() {
+		fn()
+		ctx.Wait()
+	}()
+}
+
+// Cmd -
+func (ctx *TestContext) Cmd(fn interface{}) {
+	value := reflect.ValueOf(fn)
+
+	if value.Kind() != reflect.Func {
+		panic("Check must receive a function.")
+	}
+
+	if value.Type().NumIn() != 1 {
+		panic("Function can only take 1 argument")
+	}
+
+	cmd := <-ctx.CmdChan
+	value.Call([]reflect.Value{reflect.ValueOf(cmd)})
+	<-ctx.ContinueChan
+}
+
+// End -
+func (ctx *TestContext) End(fn ...func()) {
+	<-ctx.ContinueChan
+	if len(fn) > 0 {
+		fn[0]()
+	}
+}
+
 // NewTestContext -
-func NewTestContext(expected [][]interface{}) *TestContext {
+func NewTestContext() *TestContext {
 	return &TestContext{
-		Context:  context.Background(),
-		Expected: expected,
+		Context:      context.Background(),
+		CmdChan:      make(chan interface{}),
+		ContinueChan: make(chan interface{}),
 	}
-}
-
-// FunctionCall -
-func FunctionCall(args ...interface{}) []interface{} {
-	return args
-}
-
-// Afterer -
-type Afterer struct {
-	CallLog []interface{}
-}
-
-// After -
-func (a *Afterer) After(after interface{}) []interface{} {
-	a.CallLog = append(a.CallLog, after)
-	return a.CallLog
-}
-
-// Before -
-func Before(before interface{}) *Afterer {
-	a := &Afterer{
-		CallLog: []interface{}{before},
-	}
-	return a
 }

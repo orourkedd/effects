@@ -4,26 +4,32 @@ import (
 	"testing"
 	"time"
 
+	"github.com/orourkedd/effects/pkg/effects"
 	"github.com/stretchr/testify/assert"
-	"orourkedd.com/effects/pkg/effects"
 )
 
 func TestMain(t *testing.T) {
-	n := time.Now()
-	expected := [][]interface{}{
-		effects.Before(Now{}).After(Now{Time: n}),
-		effects.Before(effects.FunctionCall(foo, "foo")).After(n),
-	}
-	ctx := effects.NewTestContext(expected)
-	err := fn(ctx)
-	assert.Nil(t, err)
-	// for i, value := range expected {
-	// actual := ctx.CallLog[i]
-	// expected := value[0]
-	// assert.Equal(t, expected, actual)
-	// fmt.Println("actual:", actual)
-	// fmt.Println("expected:", expected)
-	// fmt.Println(reflect.DeepEqual(actual, expected))
-	// assert.True(t, reflect.DeepEqual(expected, actual))
-	// }
+	ctx := effects.NewTestContext()
+
+	var body string
+	var err error
+
+	ctx.Start(func() {
+		body, err = fn(ctx)
+	})
+
+	ctx.Cmd(func(cmd *Now) {
+		assert.Equal(t, cmd, &Now{})
+		cmd.Time = time.Now()
+	})
+
+	ctx.Cmd(func(cmd *Get) {
+		assert.Equal(t, cmd, &Get{URL: "https://www.swapi.co/api/people/1"})
+		cmd.Body = "{...}"
+	})
+
+	ctx.End(func() {
+		assert.Nil(t, err)
+		assert.Equal(t, "{...}", body)
+	})
 }

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/imroc/req"
-	"orourkedd.com/effects/pkg/effects"
+	"github.com/orourkedd/effects/pkg/effects"
 )
 
 // Now -
