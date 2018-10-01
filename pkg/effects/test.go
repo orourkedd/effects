@@ -2,6 +2,7 @@ package effects
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -41,21 +42,23 @@ func (ctx *TestContext) Abort(args ...interface{}) bool {
 
 // Do processes a command
 func (ctx *TestContext) Do(cmd Cmd) error {
-	// cmdType := reflect.TypeOf(cmd)
-	// cmdValue := reflect.ValueOf(cmd)
-	// fmt.Println("value:", cmdValue)
-	// fmt.Println("Type:", cmdType)
-	// copiedCmd := reflect.New(cmdType)
-	// copier.Copy(&copiedCmd, cmdValue)
-	// fmt.Println("Do", cmd, copiedCmd)
-	// ctx.CallLog = append(ctx.CallLog, copiedCmd)
-	// fmt.Println("Expected:", ctx.Expected[ctx.CallIndex][0])
-	// fmt.Println("Actual:", cmd)
-	expected := reflect.ValueOf(ctx.Expected[ctx.CallIndex][0]).Interface()
+	before := ctx.Expected[ctx.CallIndex][0]
+	after := ctx.Expected[ctx.CallIndex][1]
+
+	// Do assertion
+	expected := reflect.ValueOf(before).Interface()
 	actual := reflect.ValueOf(cmd).Elem().Interface()
-	// fmt.Println("Equal?:", reflect.DeepEqual(expected, actual))
+	fmt.Println(expected, actual)
 	assert.Equal(ctx.Testing, expected, actual)
+
+	// Set pointer to new value
+	ptr := reflect.ValueOf(cmd).Elem()
+	if ptr.CanSet() {
+		ptr.Set(reflect.ValueOf(after))
+	}
+
 	ctx.CallIndex++
+
 	return nil
 }
 
