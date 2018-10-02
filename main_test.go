@@ -11,13 +11,6 @@ import (
 func TestMain(t *testing.T) {
 	ctx := effects.NewTestContext()
 
-	var body string
-	var err error
-
-	ctx.Start(func() {
-		body, err = fn(ctx)
-	})
-
 	ctx.Cmd(func(cmd *Now) {
 		assert.Equal(t, cmd, &Now{})
 		cmd.Time = time.Now()
@@ -28,8 +21,7 @@ func TestMain(t *testing.T) {
 		cmd.Body = "{...}"
 	})
 
-	ctx.End(func() {
-		assert.Nil(t, err)
-		assert.Equal(t, "{...}", body)
-	})
+	body, err := fn(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, "{...}", body)
 }
