@@ -38,13 +38,28 @@ func fn(ctx effects.Context) (string, error) {
 		log.Fatal(err)
 	}
 
-	// pass a child context to the next function.  This is how the test framework will know
-	// where to create seams in your code.
-	// n2, err := foo(ctx.Child(), "foo")
+	// Do a list of commands in a series
+	times := []*Now{
+		&Now{}, &Now{}, &Now{},
+	}
+	err = ctx.DoSeries(times)
+	if err != nil {
+		return "", err
+	}
+
+	// Do a list of commands in parallel
+	timesConcurrent := []*Now{
+		&Now{}, &Now{}, &Now{},
+	}
+	err = ctx.DoConcurrent(timesConcurrent)
+	if err != nil {
+		return "", err
+	}
+
+	// _, err = foo(ctx.Child(), "foo")
 	// if err != nil {
-	// 	return err
+	// 	return "", err
 	// }
-	// fmt.Println(n2)
 
 	return g.Body, nil
 }

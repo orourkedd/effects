@@ -2,13 +2,16 @@ package effects
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
 // Context -
 type Context interface {
 	Child() Context
-	Do(cmd interface{}) error
+	Do(interface{}) error
+	DoSeries(interface{}) error
+	DoConcurrent(interface{}) error
 	Deadline() (deadline time.Time, ok bool)
 	Done() <-chan struct{}
 	Err() error
@@ -38,6 +41,39 @@ func (ctx RealContext) Abort(args ...interface{}) bool {
 // Do processes a command
 func (ctx RealContext) Do(cmd interface{}) error {
 	return ctx.Interpreter(cmd, ctx)
+}
+
+// DoSeries processes a command
+func (ctx RealContext) DoSeries(cmds interface{}) error {
+	list := cmds.([]interface{})
+	for _, cmd := range list {
+		err := ctx.Interpreter(cmd, ctx)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DoConcurrent processes a command
+func (ctx RealContext) DoConcurrent(cmds interface{}) error {
+	list := cmds.([]interface{})
+	wg := sync.WaitGroup{}
+	wg.Add(len(list))
+
+	var err error
+
+	for _, cmd := range list {
+		go func(c interface{}) {
+			cmdErr := ctx.Interpreter(c, ctx)
+			if cmdErr != nil {
+				err = cmdErr
+			}
+		}(cmd)
+	}
+	wg.Wait()
+
+	return err
 }
 
 // Deadline -

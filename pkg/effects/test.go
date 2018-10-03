@@ -13,7 +13,7 @@ type TestContext struct {
 	Args        []interface{}
 	Expected    [][]interface{}
 	ShouldAbort bool
-	CmdQueue    []func(interface{})
+	CmdQueue    []func(interface{}) error
 	CmdIndex    int
 }
 
@@ -36,7 +36,21 @@ func (ctx *TestContext) Abort(args ...interface{}) bool {
 
 // Do processes a command
 func (ctx *TestContext) Do(cmd interface{}) error {
-	ctx.CmdQueue[ctx.CmdIndex](cmd)
+	err := ctx.CmdQueue[ctx.CmdIndex](cmd)
+	ctx.CmdIndex++
+	return err
+}
+
+// DoSeries processes a command
+func (ctx *TestContext) DoSeries(cmds interface{}) error {
+	ctx.CmdQueue[ctx.CmdIndex](cmds)
+	ctx.CmdIndex++
+	return nil
+}
+
+// DoConcurrent processes a command
+func (ctx *TestContext) DoConcurrent(cmds interface{}) error {
+	ctx.CmdQueue[ctx.CmdIndex](cmds)
 	ctx.CmdIndex++
 	return nil
 }
@@ -63,7 +77,7 @@ func (ctx *TestContext) Value(key interface{}) interface{} {
 
 // Cmd -
 func (ctx *TestContext) Cmd(fn interface{}) {
-	f := func(cmd interface{}) {
+	f := func(cmd interface{}) error {
 		value := reflect.ValueOf(fn)
 
 		if value.Kind() != reflect.Func {
@@ -74,7 +88,16 @@ func (ctx *TestContext) Cmd(fn interface{}) {
 			panic("Function can only take 1 argument")
 		}
 
-		value.Call([]reflect.Value{reflect.ValueOf(cmd)})
+		results := value.Call([]reflect.Value{reflect.ValueOf(cmd)})
+
+		if len(results) == 0 {
+			return nil
+		}
+
+		err := results[0].Interface().(error)
+
+		return err
+
 	}
 	ctx.CmdQueue = append(ctx.CmdQueue, f)
 }
