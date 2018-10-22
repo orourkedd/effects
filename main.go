@@ -56,17 +56,18 @@ func fn(ctx effects.Context) (string, error) {
 		return "", err
 	}
 
-	// _, err = foo(ctx.Child(), "foo")
-	// if err != nil {
-	// 	return "", err
-	// }
+	subFuncTime, err := foo(ctx.Child(), "foo")
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("subFuncTime:", subFuncTime)
 
 	return g.Body, nil
 }
 
 func foo(ctx effects.Context, value string) (time.Time, error) {
 	if ctx.Abort(foo, value) { // pass in the args for asserting
-		return time.Time{}, nil
+		return ctx.Return().(time.Time), ctx.Err()
 	}
 
 	// Get current time

@@ -17,6 +17,7 @@ type Context interface {
 	Err() error
 	Value(key interface{}) interface{}
 	Abort(...interface{}) bool
+	Return() interface{}
 }
 
 // RealContext is an effects-as-data context
@@ -31,6 +32,11 @@ func (ctx RealContext) Child() Context {
 		Interpreter: ctx.Interpreter,
 		Context:     ctx,
 	}
+}
+
+// Return -
+func (ctx RealContext) Return() interface{} {
+	return nil
 }
 
 // Abort -

@@ -8,13 +8,17 @@ import (
 
 // TestContext is an effects-as-data context
 type TestContext struct {
-	Context     context.Context
-	Interpreter func(interface{}, Context) error
-	Args        []interface{}
-	Expected    [][]interface{}
-	ShouldAbort bool
-	CmdQueue    []func(interface{}) error
-	CmdIndex    int
+	Context            context.Context
+	Parent             *TestContext
+	Interpreter        func(interface{}, Context) error
+	Args               []interface{}
+	Expected           [][]interface{}
+	ShouldAbort        bool
+	CmdQueue           []func(interface{}) error
+	CmdQueueWithResult []func(...interface{}) (interface{}, error)
+	CmdIndex           int
+	FnArgs             []interface{}
+	FnErr              error
 }
 
 // Child -
@@ -22,12 +26,22 @@ func (ctx *TestContext) Child() Context {
 	return &TestContext{
 		Context:     ctx,
 		ShouldAbort: true,
+		Parent:      ctx,
 	}
+}
+
+// Return -
+func (ctx *TestContext) Return() interface{} {
+	result, err := ctx.Parent.CmdQueueWithResult[ctx.Parent.CmdIndex](ctx.FnArgs...)
+	ctx.Parent.CmdIndex++
+	ctx.FnErr = err
+	return result
 }
 
 // Abort -
 func (ctx *TestContext) Abort(args ...interface{}) bool {
 	if ctx.ShouldAbort {
+		ctx.FnArgs = args
 		return true
 	}
 	// record stuff here
@@ -67,7 +81,7 @@ func (ctx *TestContext) Done() <-chan struct{} {
 
 // Err -
 func (ctx *TestContext) Err() error {
-	return ctx.Context.Err()
+	return ctx.FnErr
 }
 
 // Value -
@@ -97,9 +111,36 @@ func (ctx *TestContext) Cmd(fn interface{}) {
 		err := results[0].Interface().(error)
 
 		return err
-
 	}
 	ctx.CmdQueue = append(ctx.CmdQueue, f)
+
+	fWithResult := func(args ...interface{}) (interface{}, error) {
+		value := reflect.ValueOf(fn)
+
+		if value.Kind() != reflect.Func {
+			panic("Check must receive a function.")
+		}
+
+		argValues := []reflect.Value{}
+		for _, a := range args {
+			argValues = append(argValues, reflect.ValueOf(a))
+		}
+
+		results := value.Call(argValues)
+
+		if len(results) != 2 {
+			panic("function must return 2 values")
+		}
+
+		err, ok := results[1].Interface().(error)
+
+		if ok {
+			return results[0].Interface(), err
+		} else {
+			return results[0].Interface(), nil
+		}
+	}
+	ctx.CmdQueueWithResult = append(ctx.CmdQueueWithResult, fWithResult)
 }
 
 // NewTestContext -
