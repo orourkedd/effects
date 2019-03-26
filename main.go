@@ -2,10 +2,8 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"time"
-
 	"github.com/orourkedd/effects/pkg/effects"
+	"log"
 )
 
 func main() {
@@ -18,10 +16,6 @@ func main() {
 }
 
 func fn(ctx effects.Context) (string, error) {
-	if ctx.Abort() { // pass in the args for asserting
-		return "", nil
-	}
-
 	// Get current time
 	n := Now{}
 	err := ctx.Do(&n)
@@ -39,56 +33,18 @@ func fn(ctx effects.Context) (string, error) {
 	}
 
 	// Do a list of commands in a series
-	times := []*Now{
-		&Now{}, &Now{}, &Now{},
-	}
+	times := []*Now{{}, {}, {}}
 	err = ctx.DoSeries(times)
 	if err != nil {
 		return "", err
 	}
 
 	// Do a list of commands in parallel
-	timesConcurrent := []*Now{
-		&Now{}, &Now{}, &Now{},
-	}
+	timesConcurrent := []*Now{{}, {}, {}}
 	err = ctx.DoConcurrent(timesConcurrent)
 	if err != nil {
 		return "", err
 	}
 
-	subFuncTime, err := foo(ctx.Child(), "foo")
-	if err != nil {
-		return "", err
-	}
-	fmt.Println("subFuncTime:", subFuncTime)
-
 	return g.Body, nil
-}
-
-func foo(ctx effects.Context, value string) (time.Time, error) {
-	if ctx.Abort(foo, value) { // pass in the args for asserting
-		return ctx.Return().(time.Time), ctx.Err()
-	}
-
-	// Get current time
-	n := Now{}
-	err := ctx.Do(&n)
-	if err != nil {
-		return time.Time{}, nil
-	}
-
-	bar(ctx.Child())
-
-	return n.Time, nil
-}
-
-func bar(ctx effects.Context) {
-	if ctx.Abort(bar) {
-		return
-	}
-
-	// Get current time
-	n := Now{}
-	ctx.Do(&n)
-	fmt.Println(n.Time)
 }

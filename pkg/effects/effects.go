@@ -2,6 +2,7 @@ package effects
 
 import (
 	"context"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -51,7 +52,17 @@ func (ctx RealContext) Do(cmd interface{}) error {
 
 // DoSeries processes a command
 func (ctx RealContext) DoSeries(cmds interface{}) error {
-	list := cmds.([]interface{})
+	s := reflect.ValueOf(cmds)
+	if s.Kind() != reflect.Slice {
+		panic("InterfaceSlice() given a non-slice type")
+	}
+
+	list := make([]interface{}, s.Len())
+
+	for i := 0; i < s.Len(); i++ {
+		list[i] = s.Index(i).Interface()
+	}
+
 	for _, cmd := range list {
 		err := ctx.Interpreter(cmd, ctx)
 		if err != nil {
@@ -63,7 +74,17 @@ func (ctx RealContext) DoSeries(cmds interface{}) error {
 
 // DoConcurrent processes a command
 func (ctx RealContext) DoConcurrent(cmds interface{}) error {
-	list := cmds.([]interface{})
+	s := reflect.ValueOf(cmds)
+	if s.Kind() != reflect.Slice {
+		panic("InterfaceSlice() given a non-slice type")
+	}
+
+	list := make([]interface{}, s.Len())
+
+	for i := 0; i < s.Len(); i++ {
+		list[i] = s.Index(i).Interface()
+	}
+
 	wg := sync.WaitGroup{}
 	wg.Add(len(list))
 
@@ -71,6 +92,8 @@ func (ctx RealContext) DoConcurrent(cmds interface{}) error {
 
 	for _, cmd := range list {
 		go func(c interface{}) {
+			defer wg.Done()
+
 			cmdErr := ctx.Interpreter(c, ctx)
 			if cmdErr != nil {
 				err = cmdErr
