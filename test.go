@@ -2,11 +2,11 @@ package effects
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 )
 
-// TestContext is an effects-as-data context
 type TestContext struct {
 	Context            context.Context
 	Parent             *TestContext
@@ -21,75 +21,49 @@ type TestContext struct {
 	FnErr              error
 }
 
-// Child -
-func (ctx *TestContext) Child() Context {
-	return &TestContext{
-		Context:     ctx,
-		ShouldAbort: true,
-		Parent:      ctx,
-	}
-}
-
-// Return -
-func (ctx *TestContext) Return() interface{} {
-	result, err := ctx.Parent.CmdQueueWithResult[ctx.Parent.CmdIndex](ctx.FnArgs...)
-	ctx.Parent.CmdIndex++
-	ctx.FnErr = err
-	return result
-}
-
-// Abort -
-func (ctx *TestContext) Abort(args ...interface{}) bool {
-	if ctx.ShouldAbort {
-		ctx.FnArgs = args
-		return true
-	}
-	// record stuff here
-	return false
-}
-
-// Do processes a command
 func (ctx *TestContext) Do(cmd interface{}) error {
+	if ctx.CmdIndex >= len(ctx.CmdQueue) {
+		panic(fmt.Sprintf("attempting to process a command (%d) not specified in test", ctx.CmdIndex+1))
+	}
 	err := ctx.CmdQueue[ctx.CmdIndex](cmd)
 	ctx.CmdIndex++
 	return err
 }
 
-// DoSeries processes a command
 func (ctx *TestContext) DoSeries(cmds interface{}) error {
-	ctx.CmdQueue[ctx.CmdIndex](cmds)
+	if ctx.CmdIndex >= len(ctx.CmdQueue) {
+		panic(fmt.Sprintf("attempting to process a command (%d) not specified in test", ctx.CmdIndex+1))
+	}
+	err := ctx.CmdQueue[ctx.CmdIndex](cmds)
 	ctx.CmdIndex++
-	return nil
+	return err
 }
 
-// DoConcurrent processes a command
 func (ctx *TestContext) DoConcurrent(cmds interface{}) error {
-	ctx.CmdQueue[ctx.CmdIndex](cmds)
+	if ctx.CmdIndex >= len(ctx.CmdQueue) {
+		panic(fmt.Sprintf("attempting to process a command (%d) not specified in test", ctx.CmdIndex+1))
+	}
+	err := ctx.CmdQueue[ctx.CmdIndex](cmds)
 	ctx.CmdIndex++
-	return nil
+	return err
 }
 
-// Deadline -
 func (ctx *TestContext) Deadline() (deadline time.Time, ok bool) {
 	return ctx.Context.Deadline()
 }
 
-// Done -
 func (ctx *TestContext) Done() <-chan struct{} {
 	return ctx.Context.Done()
 }
 
-// Err -
 func (ctx *TestContext) Err() error {
 	return ctx.FnErr
 }
 
-// Value -
 func (ctx *TestContext) Value(key interface{}) interface{} {
 	return ctx.Context.Value(key)
 }
 
-// Cmd -
 func (ctx *TestContext) Cmd(fn interface{}) {
 	f := func(cmd interface{}) error {
 		value := reflect.ValueOf(fn)
@@ -143,7 +117,13 @@ func (ctx *TestContext) Cmd(fn interface{}) {
 	ctx.CmdQueueWithResult = append(ctx.CmdQueueWithResult, fWithResult)
 }
 
-// NewTestContext -
+func (ctx *TestContext) Finished() error {
+	if ctx.CmdIndex != len(ctx.CmdQueue) {
+		return fmt.Errorf("expected %d cmds to be processed but processed %d", len(ctx.CmdQueue), ctx.CmdIndex)
+	}
+	return nil
+}
+
 func NewTestContext() *TestContext {
 	return &TestContext{
 		Context: context.Background(),
