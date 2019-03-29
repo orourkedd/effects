@@ -123,9 +123,9 @@ func (ctx RealContext) Value(key interface{}) interface{} {
 	return ctx.Context.Value(key)
 }
 
-func NewContext(interpreter func(interface{}, Context) error) Context {
+func NewContext(ctx context.Context, interpreter func(interface{}, Context) error) Context {
 	return RealContext{
 		Interpreter: interpreter,
-		Context:     context.Background(),
+		Context:     ctx,
 	}
 }

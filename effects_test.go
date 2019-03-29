@@ -1,6 +1,7 @@
 package effects_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/orourkedd/effects"
@@ -17,6 +18,10 @@ type Panic struct{}
 
 type ErrorOut struct{}
 
+type NeverReturn struct {
+	ContextDone bool
+}
+
 var now = time.Date(2019, 1, 1, 0, 0, 0, 0, time.Local)
 
 func interpreter(command interface{}, ctx effects.Context) error {
@@ -29,6 +34,15 @@ func interpreter(command interface{}, ctx effects.Context) error {
 
 	case *ErrorOut:
 		return errors.New("oops")
+
+	case *NeverReturn:
+		select {
+		case <-ctx.Done():
+			cmd.ContextDone = true
+			return ctx.Err()
+		case <-time.After(1000 * time.Hour):
+			return nil
+		}
 
 	default:
 		panic(fmt.Sprintf("Unknown command type: %T", cmd))
@@ -47,7 +61,7 @@ func TestEffectsBasic(t *testing.T) {
 		return n.Time, nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	result, err := fn(ctx)
 	assert.Nil(t, err)
@@ -64,7 +78,7 @@ func TestEffectsNonPtrCmd(t *testing.T) {
 		return n.Time, nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	_, err := fn(ctx)
 	assert.NotNil(t, err)
@@ -81,7 +95,7 @@ func TestEffectsHandleInterpreterPanic(t *testing.T) {
 		return nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	err := fn(ctx)
 	assert.NotNil(t, err)
@@ -98,7 +112,7 @@ func TestEffectsHandleInterpreterError(t *testing.T) {
 		return nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	err := fn(ctx)
 	assert.NotNil(t, err)
@@ -115,7 +129,7 @@ func TestEffectsSeries(t *testing.T) {
 		return n, nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	result, err := fn(ctx)
 	assert.Nil(t, err)
@@ -132,7 +146,7 @@ func TestEffectsPassPointerToSliceToDoSeries(t *testing.T) {
 		return nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	err := fn(ctx)
 	assert.NotNil(t, err)
@@ -149,7 +163,7 @@ func TestEffectsPassSliceOfNonPtrsToDoSeries(t *testing.T) {
 		return nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	err := fn(ctx)
 	assert.NotNil(t, err)
@@ -165,7 +179,7 @@ func TestEffectsPassNonSliceToDoSeries(t *testing.T) {
 		return nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	err := fn(ctx)
 	assert.NotNil(t, err)
@@ -182,7 +196,7 @@ func TestEffectsConcurrent(t *testing.T) {
 		return n, nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	result, err := fn(ctx)
 	assert.Nil(t, err)
@@ -199,7 +213,7 @@ func TestEffectsPassPointerToSliceToDoConcurrent(t *testing.T) {
 		return nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	err := fn(ctx)
 	assert.NotNil(t, err)
@@ -216,7 +230,7 @@ func TestEffectsPassSliceOfNonPtrsToDoConcurrent(t *testing.T) {
 		return nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	err := fn(ctx)
 	assert.NotNil(t, err)
@@ -232,7 +246,7 @@ func TestEffectsPassNonSliceToDoConcurrent(t *testing.T) {
 		return nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	err := fn(ctx)
 	assert.NotNil(t, err)
@@ -249,9 +263,45 @@ func TestEffectsPassNilPtr(t *testing.T) {
 		return n.Time, nil
 	}
 
-	ctx := effects.NewContext(interpreter)
+	ctx := effects.NewContext(context.Background(), interpreter)
 
 	_, err := fn(ctx)
 	assert.NotNil(t, err)
 	assert.Equal(t, "ctx.Do(...) cannot receive a nil ptr", err.Error())
+}
+
+func TestEffectsUseParentContext(t *testing.T) {
+	fn := func(ctx effects.Context) error {
+		n := NeverReturn{}
+		err := ctx.Do(&n)
+		// validate that the context timeout code path was exercised
+		assert.True(t, n.ContextDone)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	done := make(chan struct{})
+
+	timeoutCtx, _ := context.WithTimeout(context.Background(), time.Millisecond*100)
+	ctx := effects.NewContext(timeoutCtx, interpreter)
+
+	go func() {
+		err := fn(ctx)
+		assert.NotNil(t, err)
+		// validate that context deadline exceeded error was returned
+		assert.Equal(t, "context deadline exceeded", err.Error())
+
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-ctx.Done():
+		// noop
+	case <-time.After(time.Second * 1):
+		assert.Fail(t, "effects context did not timeout")
+	}
+
+	<-done
 }
