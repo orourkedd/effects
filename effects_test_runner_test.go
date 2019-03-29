@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+type Get struct {
+	URL  string
+	Body string
+}
+
 func testRunnerFn(ctx effects.Context) (string, error) {
 	// Get current time
 	n := Now{}
@@ -271,6 +276,132 @@ func TestEffectsTestRunnerTooFewStepsConcurrent(t *testing.T) {
 			t.Errorf("The code did not panic")
 		} else {
 			assert.Equal(t, "attempting to process a command (4) not specified in test", r)
+		}
+	}()
+
+	testRunnerFn(ctx)
+}
+
+func TestEffectsTestRunnerTestExpectsWrongType(t *testing.T) {
+	ctx := effects.NewTestContext()
+
+	ctx.Cmd(func(cmd *Get) {
+		assert.Equal(t, cmd, &Get{URL: "https://www.swapi.co/api/people/1"})
+		cmd.Body = "{...}"
+	})
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Errorf("The code did not panic")
+		} else {
+			assert.Equal(t, "Your test expected a command of type *effects_test.Get, but the actual command was of type *effects_test.Now", r)
+		}
+	}()
+
+	testRunnerFn(ctx)
+}
+
+func TestEffectsTestRunnerTestExpectsWrongTypeWithResult(t *testing.T) {
+	ctx := effects.NewTestContext()
+
+	ctx.Cmd(func(cmd *Get) error {
+		assert.Equal(t, cmd, &Get{URL: "https://www.swapi.co/api/people/1"})
+		cmd.Body = "{...}"
+		return nil
+	})
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Errorf("The code did not panic")
+		} else {
+			assert.Equal(t, "Your test expected a command of type *effects_test.Get, but the actual command was of type *effects_test.Now", r)
+		}
+	}()
+
+	testRunnerFn(ctx)
+}
+
+func TestEffectsTestRunnerTestCmdFunctionReturnsNonError(t *testing.T) {
+	ctx := effects.NewTestContext()
+
+	ctx.Cmd(func(cmd *Now) string { return "" })
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Errorf("The code did not panic")
+		} else {
+			assert.Equal(t, "functions passed to ctx.Cmd(...) must return an error or return nothing.  In your test, the function is returning a value of type `string`", r)
+		}
+	}()
+
+	testRunnerFn(ctx)
+}
+
+func TestEffectsTestRunnerTestCmdShouldOnlyTakeOneArgument(t *testing.T) {
+	ctx := effects.NewTestContext()
+
+	ctx.Cmd(func(c1 *Now, c2 *Now) {})
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Errorf("The code did not panic")
+		} else {
+			assert.Equal(t, "ctx.Cmd(...) must receive a function that takes only 1 argument.  In your test, you're passing in a function that takes 2 arguments", r)
+		}
+	}()
+
+	testRunnerFn(ctx)
+}
+
+func TestEffectsTestRunnerTestPassesNonFunctionToCmd(t *testing.T) {
+	ctx := effects.NewTestContext()
+
+	ctx.Cmd("NOT A FUNCTION")
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Errorf("The code did not panic")
+		} else {
+			assert.Equal(t, "ctx.Cmd(...) must receive a function.  In your test, you're passing in a value of type `string`", r)
+		}
+	}()
+
+	testRunnerFn(ctx)
+}
+
+func TestEffectsTestRunnerTestCmdShouldTakeAFunctionWithAPtrArgument(t *testing.T) {
+	ctx := effects.NewTestContext()
+
+	ctx.Cmd(func(c1 Now) {})
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Errorf("The code did not panic")
+		} else {
+			assert.Equal(t, "ctx.Cmd(...) must receive a function that takes a single argument of kind ptr (pointer) or a slice of pointers", r)
+		}
+	}()
+
+	testRunnerFn(ctx)
+}
+
+func TestEffectsTestRunnerTestCmdShouldTakeAFunctionWithASliceOfPtrArgument(t *testing.T) {
+	ctx := effects.NewTestContext()
+
+	ctx.Cmd(func(c1 []Now) {})
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Errorf("The code did not panic")
+		} else {
+			assert.Equal(t, "ctx.Cmd(...) must receive a function that takes a single argument of kind ptr (pointer) or a slice of pointers", r)
 		}
 	}()
 

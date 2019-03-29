@@ -8,17 +8,16 @@ import (
 )
 
 type TestContext struct {
-	Context            context.Context
-	Parent             *TestContext
-	Interpreter        func(interface{}, Context) error
-	Args               []interface{}
-	Expected           [][]interface{}
-	ShouldAbort        bool
-	CmdQueue           []func(interface{}) error
-	CmdQueueWithResult []func(...interface{}) (interface{}, error)
-	CmdIndex           int
-	FnArgs             []interface{}
-	FnErr              error
+	Context     context.Context
+	Parent      *TestContext
+	Interpreter func(interface{}, Context) error
+	Args        []interface{}
+	Expected    [][]interface{}
+	ShouldAbort bool
+	CmdQueue    []func(interface{}) error
+	CmdIndex    int
+	FnArgs      []interface{}
+	FnErr       error
 }
 
 func (ctx *TestContext) Do(cmd interface{}) error {
@@ -68,53 +67,52 @@ func (ctx *TestContext) Cmd(fn interface{}) {
 	f := func(cmd interface{}) error {
 		value := reflect.ValueOf(fn)
 
+		// Verify that a function is passed in
 		if value.Kind() != reflect.Func {
-			panic("Check must receive a function.")
+			panic(fmt.Sprintf("ctx.Cmd(...) must receive a function.  In your test, you're passing in a value of type `%v`", value.Type()))
 		}
 
+		// Verify that the function takes on 1 argument
 		if value.Type().NumIn() != 1 {
-			panic("Function can only take 1 argument")
+			panic(fmt.Sprintf("ctx.Cmd(...) must receive a function that takes only 1 argument.  In your test, you're passing in a function that takes %d arguments", value.Type().NumIn()))
+		}
+
+		// Verify that the function's argument is a pointer or a slice of pointers
+		expectedType := value.Type().In(0)
+		actualType := reflect.TypeOf(cmd)
+
+		if expectedType.Kind() == reflect.Slice {
+			if expectedType.Elem().Kind() != reflect.Ptr {
+				panic("ctx.Cmd(...) must receive a function that takes a single argument of kind ptr (pointer) or a slice of pointers")
+			}
+		} else {
+			if expectedType.Kind() != reflect.Ptr {
+				panic("ctx.Cmd(...) must receive a function that takes a single argument of kind ptr (pointer) or a slice of pointers")
+			}
+		}
+
+		// Verify that the function's argument type is the same as the type that comes from the non-test code
+		if expectedType != actualType {
+			panic(fmt.Sprintf("Your test expected a command of type %v, but the actual command was of type %v", expectedType, actualType))
 		}
 
 		results := value.Call([]reflect.Value{reflect.ValueOf(cmd)})
 
+		// If the function returns nothing, return nil
 		if len(results) == 0 {
 			return nil
 		}
 
-		err := results[0].Interface().(error)
+		// Verify that the values returned from the function is an error
+		err, ok := results[0].Interface().(error)
+
+		if !ok {
+			panic(fmt.Sprintf("functions passed to ctx.Cmd(...) must return an error or return nothing.  In your test, the function is returning a value of type `%v`", results[0].Type()))
+		}
 
 		return err
 	}
 	ctx.CmdQueue = append(ctx.CmdQueue, f)
-
-	fWithResult := func(args ...interface{}) (interface{}, error) {
-		value := reflect.ValueOf(fn)
-
-		if value.Kind() != reflect.Func {
-			panic("Check must receive a function.")
-		}
-
-		argValues := []reflect.Value{}
-		for _, a := range args {
-			argValues = append(argValues, reflect.ValueOf(a))
-		}
-
-		results := value.Call(argValues)
-
-		if len(results) != 2 {
-			panic("function must return 2 values")
-		}
-
-		err, ok := results[1].Interface().(error)
-
-		if ok {
-			return results[0].Interface(), err
-		} else {
-			return results[0].Interface(), nil
-		}
-	}
-	ctx.CmdQueueWithResult = append(ctx.CmdQueueWithResult, fWithResult)
 }
 
 func (ctx *TestContext) Finished() error {

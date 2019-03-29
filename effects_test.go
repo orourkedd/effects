@@ -3,7 +3,6 @@ package effects_test
 import (
 	"errors"
 	"fmt"
-	"github.com/imroc/req"
 	"github.com/orourkedd/effects"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -12,11 +11,6 @@ import (
 
 type Now struct {
 	Time time.Time
-}
-
-type Get struct {
-	URL  string
-	Body string
 }
 
 type Panic struct{}
@@ -29,13 +23,6 @@ func interpreter(command interface{}, ctx effects.Context) error {
 	switch cmd := command.(type) {
 	case *Now:
 		cmd.Time = now
-
-	case *Get:
-		resp, err := req.Get(cmd.URL)
-		if err != nil {
-			return err
-		}
-		cmd.Body = string(resp.Bytes())
 
 	case *Panic:
 		panic("oops")
