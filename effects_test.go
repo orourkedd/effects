@@ -54,6 +54,23 @@ func TestEffectsBasic(t *testing.T) {
 	assert.Equal(t, now, result)
 }
 
+func TestEffectsNonPtrCmd(t *testing.T) {
+	fn := func(ctx effects.Context) (time.Time, error) {
+		n := Now{}
+		err := ctx.Do(n)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return n.Time, nil
+	}
+
+	ctx := effects.NewContext(interpreter)
+
+	_, err := fn(ctx)
+	assert.NotNil(t, err)
+	assert.Equal(t, "ctx.Do(...) must receive a ptr", err.Error())
+}
+
 func TestEffectsHandleInterpreterPanic(t *testing.T) {
 	fn := func(ctx effects.Context) error {
 		n := Panic{}
