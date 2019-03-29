@@ -35,6 +35,9 @@ func InterpretSafely(ctx RealContext, cmd interface{}) (err error) {
 }
 
 func (ctx RealContext) Do(cmd interface{}) error {
+	if reflect.ValueOf(cmd).IsNil() {
+		return errors.New("ctx.Do(...) cannot receive a nil ptr")
+	}
 	return InterpretSafely(ctx, cmd)
 }
 

@@ -221,3 +221,20 @@ func TestEffectsPassNonSliceToDoConcurrent(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Equal(t, "a slice of cmd pointers must be passed to `DoConcurrent` but a `bool` was passed instead", err.Error())
 }
+
+func TestEffectsPassNilPtr(t *testing.T) {
+	fn := func(ctx effects.Context) (time.Time, error) {
+		var n *Now
+		err := ctx.Do(n)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return n.Time, nil
+	}
+
+	ctx := effects.NewContext(interpreter)
+
+	_, err := fn(ctx)
+	assert.NotNil(t, err)
+	assert.Equal(t, "ctx.Do(...) cannot receive a nil ptr", err.Error())
+}
