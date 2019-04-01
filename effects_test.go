@@ -24,7 +24,7 @@ type NeverReturn struct {
 
 var now = time.Date(2019, 1, 1, 0, 0, 0, 0, time.Local)
 
-func interpreter(command interface{}, ctx effects.Context) error {
+func interpreter(ctx effects.Context, command interface{}) error {
 	switch cmd := command.(type) {
 	case *Now:
 		cmd.Time = now

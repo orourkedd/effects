@@ -21,7 +21,7 @@ type Context interface {
 
 type RealContext struct {
 	Context     context.Context
-	Interpreter func(interface{}, Context) error
+	Interpreter func(Context, interface{}) error
 }
 
 func InterpretSafely(ctx RealContext, cmd interface{}) (err error) {
@@ -31,7 +31,7 @@ func InterpretSafely(ctx RealContext, cmd interface{}) (err error) {
 			err = errors.New(r.(string))
 		}
 	}()
-	return ctx.Interpreter(cmd, ctx)
+	return ctx.Interpreter(ctx, cmd)
 }
 
 func (ctx RealContext) Do(cmd interface{}) error {
@@ -123,7 +123,7 @@ func (ctx RealContext) Value(key interface{}) interface{} {
 	return ctx.Context.Value(key)
 }
 
-func NewContext(ctx context.Context, interpreter func(interface{}, Context) error) Context {
+func NewContext(ctx context.Context, interpreter func(Context, interface{}) error) Context {
 	return RealContext{
 		Interpreter: interpreter,
 		Context:     ctx,
