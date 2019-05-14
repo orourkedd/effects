@@ -28,7 +28,16 @@ func InterpretSafely(ctx RealContext, cmd interface{}) (err error) {
 	defer func() {
 		r := recover()
 		if r != nil {
-			err = errors.New(r.(string))
+			switch rec := r.(type) {
+			case error:
+				err = rec
+
+			case string:
+				err = errors.New(rec)
+
+			default:
+				err = errors.New(fmt.Sprintf("%v", r))
+			}
 		}
 	}()
 	return ctx.Interpreter(ctx, cmd)
