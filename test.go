@@ -3,7 +3,9 @@ package effects
 import (
 	"context"
 	"fmt"
+	"github.com/sanity-io/litter"
 	"reflect"
+	"testing"
 	"time"
 )
 
@@ -18,11 +20,12 @@ type TestContext struct {
 	CmdIndex    int
 	FnArgs      []interface{}
 	FnErr       error
+	T           *testing.T
 }
 
 func (ctx *TestContext) Do(cmd interface{}) error {
 	if ctx.CmdIndex >= len(ctx.CmdQueue) {
-		panic(fmt.Sprintf("attempting to process a command (%d) not specified in test", ctx.CmdIndex+1))
+		ctx.T.Fatalf("attempting to process a command (number %d in your function) not specified in your test.  You'll need to add another ctx.Cmd(...) to your test to account for this command:\n%s", ctx.CmdIndex+1, litter.Sdump(cmd))
 	}
 	err := ctx.CmdQueue[ctx.CmdIndex](cmd)
 	ctx.CmdIndex++
@@ -115,15 +118,15 @@ func (ctx *TestContext) Cmd(fn interface{}) {
 	ctx.CmdQueue = append(ctx.CmdQueue, f)
 }
 
-func (ctx *TestContext) Finished() error {
+func (ctx *TestContext) Finished(t *testing.T) {
 	if ctx.CmdIndex != len(ctx.CmdQueue) {
-		return fmt.Errorf("expected %d cmds to be processed but processed %d", len(ctx.CmdQueue), ctx.CmdIndex)
+		t.Fatalf("expected %d cmds to be processed but processed %d", len(ctx.CmdQueue), ctx.CmdIndex)
 	}
-	return nil
 }
 
-func NewTestContext() *TestContext {
+func NewTestContext(t *testing.T) *TestContext {
 	return &TestContext{
 		Context: context.Background(),
+		T:       t,
 	}
 }

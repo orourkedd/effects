@@ -24,12 +24,12 @@ type RealContext struct {
 	Interpreter func(Context, interface{}) error
 }
 
-type EffectsError struct {
+type InterpreterError struct {
 	Cmd   interface{}
 	Cause error
 }
 
-func (e *EffectsError) Error() string {
+func (e InterpreterError) Error() string {
 	return e.Cause.Error()
 }
 
@@ -39,26 +39,27 @@ func InterpretSafely(ctx RealContext, cmd interface{}) (err error) {
 		if r != nil {
 			switch rec := r.(type) {
 			case error:
-				err = &EffectsError{
-					Cause: err,
+				err = InterpreterError{
+					Cause: rec,
 					Cmd:   cmd,
 				}
 
 			case string:
-				err = &EffectsError{
+				err = InterpreterError{
 					Cause: errors.New(rec),
 					Cmd:   cmd,
 				}
 
 			default:
-				err = &EffectsError{
+				err = InterpreterError{
 					Cause: errors.New(fmt.Sprintf("%v", r)),
 					Cmd:   cmd,
 				}
 			}
 		}
 	}()
-	return ctx.Interpreter(ctx, cmd)
+	err = ctx.Interpreter(ctx, cmd)
+	return
 }
 
 func (ctx RealContext) Do(cmd interface{}) error {
