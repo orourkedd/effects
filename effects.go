@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+type Callable interface {
+	Do(Context) error
+}
+
 type Context interface {
 	Do(interface{}) error
 	DoSeries(interface{}) error
@@ -58,7 +62,12 @@ func InterpretSafely(ctx RealContext, cmd interface{}) (err error) {
 			}
 		}
 	}()
-	err = ctx.Interpreter(ctx, cmd)
+	callable, ok := cmd.(Callable)
+	if ok {
+		err = callable.Do(ctx)
+	} else {
+		err = ctx.Interpreter(ctx, cmd)
+	}
 	return
 }
 
